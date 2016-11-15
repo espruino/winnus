@@ -2,8 +2,8 @@
   "targets": [
     {
       "target_name": "winnus",
-      "sources": [ "winnus.cpp" ],
-            'conditions': [
+      "sources": [ "cpp/winnus.cpp" ],
+      "conditions" : [
         ['OS=="win"', {
           'include_dirs': [
           ],
