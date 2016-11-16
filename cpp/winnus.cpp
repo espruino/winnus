@@ -349,7 +349,6 @@ void WINNUS_Connect(const FunctionCallbackInfo<Value>& args) {
       RETURN_ERR("UART Service not found");
     }
 
-  	// Step 3: now get the list of charactersitics. note how the pServiceBuffer is required from step 2
   	////////////////////////////////////////////////////////////////////////////
   	// Determine Characteristic Buffer Size
   	////////////////////////////////////////////////////////////////////////////
@@ -388,7 +387,7 @@ void WINNUS_Connect(const FunctionCallbackInfo<Value>& args) {
   		USHORT numChars;
   		hr = BluetoothGATTGetCharacteristics(
   			hLEDevice,
-  			pServiceBuffer,
+  			pNUSService,
   			charBufferSize,
   			pCharacteristics,
   			&numChars,
