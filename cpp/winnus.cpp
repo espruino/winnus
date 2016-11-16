@@ -267,6 +267,11 @@ void WINNUS_Connect(const FunctionCallbackInfo<Value>& args) {
   // Grab argument
   v8::String::Utf8Value pathArg(args[0]->ToString());
 
+  GUID UUID_NUS, UUID_NUS_RX, UUID_NUS_TX;
+	CLSIDFromString(TEXT(L"{6e400001-b5a3-f393-e0a9-e50e24dcca9e}"), &UUID_NUS);
+  CLSIDFromString(TEXT(L"{6e400002-b5a3-f393-e0a9-e50e24dcca9e}"), &UUID_NUS_TX);
+  CLSIDFromString(TEXT(L"{6e400003-b5a3-f393-e0a9-e50e24dcca9e}"), &UUID_NUS_RX);
+
   // start connecting
   hLEDevice = CreateFile(
     *pathArg,
@@ -330,6 +335,20 @@ void WINNUS_Connect(const FunctionCallbackInfo<Value>& args) {
       RETURN_ERR("BluetoothGATTGetServices");
   	}
 
+    PBTH_LE_GATT_SERVICE pNUSService = 0;
+    for (int ii = 0; ii <numServices; ii++) {
+  		PBTH_LE_GATT_SERVICE currGattSvc;
+  		currGattSvc = &pServiceBuffer[ii];
+      if (!currGattSvc->ServiceUuid.IsShortUuid &&
+          currGattSvc->ServiceUuid.Value.LongUuid == UUID_NUS)
+        pNUSService = currGattSvc;
+    }
+
+    if (!pNUSService) {
+      safeCloseConnection();
+      RETURN_ERR("UART Service not found");
+    }
+
   	// Step 3: now get the list of charactersitics. note how the pServiceBuffer is required from step 2
   	////////////////////////////////////////////////////////////////////////////
   	// Determine Characteristic Buffer Size
@@ -338,7 +357,7 @@ void WINNUS_Connect(const FunctionCallbackInfo<Value>& args) {
   	USHORT charBufferSize;
   	hr = BluetoothGATTGetCharacteristics(
   		hLEDevice,
-  		pServiceBuffer,
+  		pNUSService,
   		0,
   		NULL,
   		&charBufferSize,
@@ -394,12 +413,14 @@ void WINNUS_Connect(const FunctionCallbackInfo<Value>& args) {
   		PBTH_LE_GATT_CHARACTERISTIC currGattChar;
   		currGattChar = &pCharacteristics[ii];
 
-  		if (currGattChar->CharacteristicUuid.Value.ShortUuid==2) {
+      if (!currGattChar->CharacteristicUuid.IsShortUuid &&
+          currGattChar->CharacteristicUuid.Value.LongUuid == UUID_NUS_TX) {
   			// TX characteristic
   			pTXCharacteristic = currGattChar;
   		}
 
-  		if (currGattChar->CharacteristicUuid.Value.ShortUuid == 3) {
+      if (!currGattChar->CharacteristicUuid.IsShortUuid &&
+          currGattChar->CharacteristicUuid.Value.LongUuid == UUID_NUS_RX) {
   			// RX characteristic
   			pRXCharacteristic = currGattChar;
   			///////////////////////////////////////////////////////////////////////////
