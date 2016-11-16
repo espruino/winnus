@@ -1,0 +1,13 @@
+{
+  "name": "winnus",
+  "version": "0.0.1",
+  "description": "Windows 8 and above BLE NUS support",
+  "main": "winnus.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "install": "node-gyp rebuild"
+  },
+  "author": "",
+  "license": "MPLv2",
+  "gypfile": true
+}
