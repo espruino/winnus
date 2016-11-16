@@ -24,6 +24,11 @@
 
 #define RETURN_ERR(text) {isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, text)));return;}
 
+HANDLE hLEDevice = 0;
+PBTH_LE_GATT_CHARACTERISTIC pCharacteristics = 0;
+PBTH_LE_GATT_CHARACTERISTIC pTXCharacteristic = 0; // send to Espruino (member of pCharacteristics)
+PBTH_LE_GATT_CHARACTERISTIC pRXCharacteristic = 0; // read from Espruino (member of pCharacteristics)
+
 namespace demo {
 
   using v8::Context;
@@ -41,12 +46,9 @@ namespace demo {
   using v8::Value;
 
 
-  void HandleBLENotification(BTH_LE_GATT_EVENT_TYPE EventType, PVOID EventOutParameter, PVOID Context)
-  {
+  void HandleBLENotification(BTH_LE_GATT_EVENT_TYPE EventType, PVOID EventOutParameter, PVOID Context) {
   	printf("notification obtained ");
   	PBLUETOOTH_GATT_VALUE_CHANGED_EVENT ValueChangedEventParameters = (PBLUETOOTH_GATT_VALUE_CHANGED_EVENT)EventOutParameter;
-
-  	HRESULT hr;
   	if (ValueChangedEventParameters->CharacteristicValue->DataSize) {
   		char buf[32];
   		int s = ValueChangedEventParameters->CharacteristicValue->DataSize;
@@ -229,6 +231,9 @@ namespace demo {
   void WINNUS_Connect(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate = args.GetIsolate();
 
+    if (hLEDevice)
+      RETURN_ERR("Already connected");
+
     // Check the number of arguments passed.
     if (args.Length() < 1) {
       // Throw an Error that is passed back to JavaScript
@@ -239,7 +244,7 @@ namespace demo {
 
     v8::String::Utf8Value pathArg(args[0]->ToString());
 
-    HANDLE hLEDevice = CreateFile(
+    hLEDevice = CreateFile(
       *pathArg,
       GENERIC_WRITE | GENERIC_READ,
       FILE_SHARE_READ | FILE_SHARE_WRITE,
@@ -267,13 +272,14 @@ namespace demo {
 
   	if (HRESULT_FROM_WIN32(ERROR_MORE_DATA) != hr) {
   		printf("BluetoothGATTGetServices - Buffer Size %d\n", hr);
+      RETURN_ERR("BluetoothGATTGetServices");
   	}
 
   	PBTH_LE_GATT_SERVICE pServiceBuffer = (PBTH_LE_GATT_SERVICE)
   		malloc(sizeof(BTH_LE_GATT_SERVICE) * serviceBufferCount);
 
   	if (NULL == pServiceBuffer) {
-  		printf("pServiceBuffer out of memory\n");
+  		RETURN_ERR("pServiceBuffer out of memory\n");
   	}
   	else {
   		RtlZeroMemory(pServiceBuffer,
@@ -294,6 +300,7 @@ namespace demo {
 
     	if (S_OK != hr) {
     		printf("BluetoothGATTGetServices - Buffer Size %d\n", hr);
+        RETURN_ERR("BluetoothGATTGetServices");
     	}
 
     	// Step 3: now get the list of charactersitics. note how the pServiceBuffer is required from step 2
@@ -312,18 +319,18 @@ namespace demo {
 
     	if (HRESULT_FROM_WIN32(ERROR_MORE_DATA) != hr) {
     		printf("BluetoothGATTGetCharacteristics - Buffer Size %d\n", hr);
+        RETURN_ERR("BluetoothGATTGetCharacteristics");
     	}
 
-    	PBTH_LE_GATT_CHARACTERISTIC pCharBuffer;
     	if (charBufferSize > 0) {
-    		pCharBuffer = (PBTH_LE_GATT_CHARACTERISTIC)
+    		pCharacteristics = (PBTH_LE_GATT_CHARACTERISTIC)
     			malloc(charBufferSize * sizeof(BTH_LE_GATT_CHARACTERISTIC));
 
-    		if (NULL == pCharBuffer) {
-    			printf("pCharBuffer out of memory\n");
+    		if (NULL == pCharacteristics) {
+    			RETURN_ERR("pCharBuffer out of memory\n");
     		}
     		else {
-    			RtlZeroMemory(pCharBuffer,
+    			RtlZeroMemory(pCharacteristics,
     				charBufferSize * sizeof(BTH_LE_GATT_CHARACTERISTIC));
     		}
 
@@ -335,16 +342,17 @@ namespace demo {
     			hLEDevice,
     			pServiceBuffer,
     			charBufferSize,
-    			pCharBuffer,
+    			pCharacteristics,
     			&numChars,
     			BLUETOOTH_GATT_FLAG_NONE);
 
     		if (S_OK != hr) {
     			printf("BluetoothGATTGetCharacteristics - Actual Data %d\n", hr);
+          RETURN_ERR("BluetoothGATTGetCharacteristics");
     		}
 
     		if (numChars != charBufferSize) {
-    			printf("buffer size and buffer size actual size mismatch\n");
+    			RETURN_ERR("buffer size and buffer size actual size mismatch\n");
     		}
     	}
 
@@ -353,29 +361,16 @@ namespace demo {
     	PBTH_LE_GATT_CHARACTERISTIC txGattChar = 0;
     	for (int ii = 0; ii <charBufferSize; ii++) {
     		PBTH_LE_GATT_CHARACTERISTIC currGattChar;
-    		currGattChar = &pCharBuffer[ii];
-    		USHORT charValueDataSize;
+    		currGattChar = &pCharacteristics[ii];
 
     		if (currGattChar->CharacteristicUuid.Value.ShortUuid==2) {
     			// TX characteristic
-    			txGattChar = currGattChar;
-    			const char *data = "LED1.set()\n";
-    			PBTH_LE_GATT_CHARACTERISTIC_VALUE value = (PBTH_LE_GATT_CHARACTERISTIC_VALUE)new uint8_t[sizeof(ULONG)+strlen(data)];
-    			value->DataSize = strlen(data);
-    			memcpy(&value->Data, data, value->DataSize);
-    			hr = BluetoothGATTSetCharacteristicValue(
-    				hLEDevice,
-    				currGattChar,
-    				value,
-    				0,
-    				BLUETOOTH_GATT_FLAG_WRITE_WITHOUT_RESPONSE
-    			);
-    			delete value;
+    			pTXCharacteristic = currGattChar;
     		}
 
     		if (currGattChar->CharacteristicUuid.Value.ShortUuid == 3) {
     			// RX characteristic
-    			rxGattChar = currGattChar;
+    			pRXCharacteristic = currGattChar;
     			///////////////////////////////////////////////////////////////////////////
     			// Determine Descriptor Buffer Size
     			////////////////////////////////////////////////////////////////////////////
@@ -390,6 +385,7 @@ namespace demo {
 
     			if (HRESULT_FROM_WIN32(ERROR_MORE_DATA) != hr) {
     				printf("BluetoothGATTGetDescriptors - Buffer Size %d\n", hr);
+            RETURN_ERR("BluetoothGATTGetDescriptors");
     			}
 
     			PBTH_LE_GATT_DESCRIPTOR pDescriptorBuffer;
@@ -399,7 +395,7 @@ namespace demo {
     						* sizeof(BTH_LE_GATT_DESCRIPTOR));
 
     				if (NULL == pDescriptorBuffer) {
-    					printf("pDescriptorBuffer out of memory\n");
+    					RETURN_ERR("pDescriptorBuffer out of memory\n");
     				}
     				else {
     					RtlZeroMemory(pDescriptorBuffer, descriptorBufferSize);
@@ -420,10 +416,11 @@ namespace demo {
 
     				if (S_OK != hr) {
     					printf("BluetoothGATTGetDescriptors - Actual Data %d\n", hr);
+              RETURN_ERR("BluetoothGATTGetDescriptors");
     				}
 
     				if (numDescriptors != descriptorBufferSize) {
-    					printf("buffer size and buffer size actual size mismatch\n");
+    					RETURN_ERR("buffer size and buffer size actual size mismatch\n");
     				}
 
     				for (int kk = 0; kk < numDescriptors; kk++) {
@@ -442,12 +439,13 @@ namespace demo {
 
     					if (HRESULT_FROM_WIN32(ERROR_MORE_DATA) != hr) {
     						printf("BluetoothGATTGetDescriptorValue - Buffer Size %d\n", hr);
+                RETURN_ERR("BluetoothGATTGetDescriptorValue");
     					}
 
     					PBTH_LE_GATT_DESCRIPTOR_VALUE pDescValueBuffer = (PBTH_LE_GATT_DESCRIPTOR_VALUE)malloc(descValueDataSize);
 
     					if (NULL == pDescValueBuffer) {
-    						printf("pDescValueBuffer out of memory\n");
+    						RETURN_ERR("pDescValueBuffer out of memory\n");
     					}
     					else {
     						RtlZeroMemory(pDescValueBuffer, descValueDataSize);
@@ -466,6 +464,7 @@ namespace demo {
     						BLUETOOTH_GATT_FLAG_NONE);
     					if (S_OK != hr) {
     						printf("BluetoothGATTGetDescriptorValue - Actual Data %d\n", hr);
+                RETURN_ERR("BluetoothGATTGetDescriptorValue");
     					}
     					// you may also get a descriptor that is read (and not notify) andi am guessing the attribute handle is out of limits
     					// we set all descriptors that are notifiable to notify us via IsSubstcibeToNotification
@@ -484,6 +483,7 @@ namespace demo {
     							BLUETOOTH_GATT_FLAG_NONE);
     						if (S_OK != hr) {
     							printf("BluetoothGATTGetDescriptorValue - Actual Data %d\n", hr);
+                  RETURN_ERR("BluetoothGATTGetDescriptorValue");
     						}
     					}
     				}
@@ -510,27 +510,61 @@ namespace demo {
 
     				if (S_OK != hr) {
     					printf("BluetoothGATTRegisterEvent - Actual Data %d\n", hr);
+              RETURN_ERR("BluetoothGATTRegisterEvent");
     				}
     			}
-
     		}
-
     	}
+  }
 
-    	// go into an inf loop that sleeps. you will ideally see notifications from the HR device
+  void WINNUS_Write(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate = args.GetIsolate();
 
-    		printf("sleep\n");
-    		Sleep(1000);
+    // Check the number of arguments passed.
+    if (args.Length() < 1) {
+      // Throw an Error that is passed back to JavaScript
+      isolate->ThrowException(Exception::TypeError(
+          String::NewFromUtf8(isolate, "One argument expected")));
+      return;
+    }
 
+    v8::String::Utf8Value dataArg(args[0]->ToString());
 
-    	CloseHandle(hLEDevice);
+    if (!hLEDevice)
+      RETURN_ERR("Bluetooth connection not open");
+    if (!pTXCharacteristic)
+      RETURN_ERR("No TX characteristic found");
 
-    	if (GetLastError() != NO_ERROR &&
-    		GetLastError() != ERROR_NO_MORE_ITEMS)
-    	{
-    		// Insert error handling here.
-    		return;
-    	}
+    PBTH_LE_GATT_CHARACTERISTIC_VALUE value = (PBTH_LE_GATT_CHARACTERISTIC_VALUE)new uint8_t[sizeof(ULONG)+dataArg.length()];
+    value->DataSize = dataArg.length();
+    memcpy(&value->Data, *dataArg, dataArg.length());
+    HRESULT hr = BluetoothGATTSetCharacteristicValue(
+      hLEDevice,
+      pTXCharacteristic,
+      value,
+      0,
+      BLUETOOTH_GATT_FLAG_WRITE_WITHOUT_RESPONSE
+    );
+    delete value;
+  }
+
+  void WINNUS_Disconnect(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate = args.GetIsolate();
+    if (!hLEDevice)
+      RETURN_ERR("Bluetooth connection not open");
+    CloseHandle(hLEDevice);
+
+    pRXCharacteristic = 0;
+    pTXCharacteristic = 0;
+    hLEDevice = 0;
+    free(pCharacteristics);
+    pCharacteristics = 0;
+
+    if (GetLastError() != NO_ERROR &&
+        GetLastError() != ERROR_NO_MORE_ITEMS)
+    {
+      RETURN_ERR("System error while closing");
+    }
   }
 
 
@@ -538,6 +572,8 @@ void init(Local<Object> exports) {
   NODE_SET_METHOD(exports, "getDevicePaths", WINNUS_GetDevicePaths);
   NODE_SET_METHOD(exports, "getDeviceNames", WINNUS_GetDeviceNames);
   NODE_SET_METHOD(exports, "connect", WINNUS_Connect);
+  NODE_SET_METHOD(exports, "disconnect", WINNUS_Disconnect);
+  NODE_SET_METHOD(exports, "write", WINNUS_Write);
 }
 
 NODE_MODULE(winnus, init)
