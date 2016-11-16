@@ -1,6 +1,12 @@
 #include <node.h>
 
 #pragma warning (disable: 4068)
+
+// Massive hack - not sure how to fix this with node-gyp?
+#undef NTDDI_VERSION
+#define NTDDI_VERSION NTDDI_WIN8
+
+
 #include <windows.h>
 #include <stdio.h>
 #include <tchar.h>
@@ -8,6 +14,7 @@
 #include <devguid.h>
 #include <regstr.h>
 #include <bthdef.h>
+#include <bthledef.h>
 #include <bluetoothleapis.h>
 
 #include <iostream>
@@ -15,6 +22,7 @@
 #include <string>
 #include <locale>
 
+#define RETURN_ERR(text) {isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, text)));return;}
 
 namespace demo {
 
@@ -33,10 +41,80 @@ namespace demo {
   using v8::Value;
 
 
+  void HandleBLENotification(BTH_LE_GATT_EVENT_TYPE EventType, PVOID EventOutParameter, PVOID Context)
+  {
+  	printf("notification obtained ");
+  	PBLUETOOTH_GATT_VALUE_CHANGED_EVENT ValueChangedEventParameters = (PBLUETOOTH_GATT_VALUE_CHANGED_EVENT)EventOutParameter;
+
+  	HRESULT hr;
+  	if (ValueChangedEventParameters->CharacteristicValue->DataSize) {
+  		char buf[32];
+  		int s = ValueChangedEventParameters->CharacteristicValue->DataSize;
+  		memcpy(buf, ValueChangedEventParameters->CharacteristicValue->Data, s);
+  		buf[s] = 0;
+  		printf("got value %s\n", buf);
+  	}
+  }
+
+
+  void WINNUS_GetDevicePaths(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate = args.GetIsolate();
+    Local<Array> array = Array::New(isolate);
+
+    // NUS GUID
+  	GUID BluetoothInterfaceGUID;
+  	CLSIDFromString(TEXT(L"{6e400001-b5a3-f393-e0a9-e50e24dcca9e}"), &BluetoothInterfaceGUID);
+
+    HDEVINFO hDI;
+  	SP_DEVICE_INTERFACE_DATA did;
+  	SP_DEVINFO_DATA dd;
+
+  	hDI = SetupDiGetClassDevs(&BluetoothInterfaceGUID, NULL, NULL, DIGCF_DEVICEINTERFACE | DIGCF_PRESENT);
+
+  	if (hDI == INVALID_HANDLE_VALUE)
+  		RETURN_ERR("Unable to access Bluetooth adaptor");
+
+  	did.cbSize = sizeof(SP_DEVICE_INTERFACE_DATA);
+  	dd.cbSize = sizeof(SP_DEVINFO_DATA);
+
+  	for (DWORD i = 0; SetupDiEnumDeviceInterfaces(hDI, NULL, &BluetoothInterfaceGUID, i, &did); i++)
+  	{
+  		DWORD size = 0;
+
+  		if (!SetupDiGetDeviceInterfaceDetail(hDI, &did, NULL, 0, &size, 0))
+  		{
+  			int err = GetLastError();
+
+  			if (err == ERROR_NO_MORE_ITEMS) break;
+
+  			PSP_DEVICE_INTERFACE_DETAIL_DATA pInterfaceDetailData = (PSP_DEVICE_INTERFACE_DETAIL_DATA)GlobalAlloc(GPTR, size);
+
+  			pInterfaceDetailData->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA);
+
+  			if (!SetupDiGetDeviceInterfaceDetail(hDI, &did, pInterfaceDetailData, size, &size, &dd))
+  				break;
 
 
 
-  void WINNUS_GetDevices(const FunctionCallbackInfo<Value>& args) {
+        Local<Object> obj = Object::New(isolate);
+        OLECHAR* bstrGuid;
+        StringFromCLSID(did.InterfaceClassGuid, &bstrGuid);
+        obj->Set(String::NewFromUtf8(isolate, "guid"), String::NewFromTwoByte(isolate, (const uint16_t *)bstrGuid));
+        ::CoTaskMemFree(bstrGuid);
+
+        //obj->Set(String::NewFromUtf8(isolate, "name"), String::NewFromUtf8(isolate, nameBuffer));
+        obj->Set(String::NewFromUtf8(isolate, "path"), String::NewFromUtf8(isolate, pInterfaceDetailData->DevicePath));
+        array->Set(array->Length(), obj);
+
+  			GlobalFree(pInterfaceDetailData);
+  		}
+  	}
+
+  	SetupDiDestroyDeviceInfoList(hDI);
+    args.GetReturnValue().Set(array);
+  }
+
+  void WINNUS_GetDeviceNames(const FunctionCallbackInfo<Value>& args) {
     Isolate* isolate = args.GetIsolate();
     Local<Array> array = Array::New(isolate);
 
@@ -45,7 +123,7 @@ namespace demo {
   	DWORD i;
 
   	// Create a HDEVINFO with all present devices.
-  	hDI = SetupDiGetClassDevs(&GUID_DEVCLASS_BLUETOOTH, NULL, NULL, DIGCF_PRESENT);
+  	hDI = SetupDiGetClassDevs(&GUID_DEVCLASS_BLUETOOTH, NULL, NULL,  DIGCF_PRESENT);
   	if (hDI == INVALID_HANDLE_VALUE) {
       isolate->ThrowException(Exception::Error(
           String::NewFromUtf8(isolate, "Unable to access Bluetooth adaptor")));
@@ -54,8 +132,7 @@ namespace demo {
 
   	// Enumerate through all devices in Set.
   	did.cbSize = sizeof(SP_DEVINFO_DATA);
-  	for (i = 0; SetupDiEnumDeviceInfo(hDI, i, &did); i++)
-  	{
+  	for (i = 0; SetupDiEnumDeviceInfo(hDI, i, &did); i++) {
   		bool hasError = false;
 
   		DWORD nameData;
@@ -131,24 +208,336 @@ namespace demo {
   		}
 
   		if (hasError)
-  		{
   			continue;
-  		}
 
       Local<Object> obj = Object::New(isolate);
+      OLECHAR* bstrGuid;
+      StringFromCLSID(did.ClassGuid, &bstrGuid);
+      obj->Set(String::NewFromUtf8(isolate, "guid"), String::NewFromTwoByte(isolate, (const uint16_t *)bstrGuid));
+      ::CoTaskMemFree(bstrGuid);
       obj->Set(String::NewFromUtf8(isolate, "name"), String::NewFromUtf8(isolate, nameBuffer));
       obj->Set(String::NewFromUtf8(isolate, "addr"), String::NewFromUtf8(isolate, addressBuffer));
       obj->Set(String::NewFromUtf8(isolate, "deviceId"), String::NewFromUtf8(isolate, deviceIdBuffer));
       array->Set(array->Length(), obj);
+      delete nameBuffer;
+      delete addressBuffer;
+      delete deviceIdBuffer;
+  	}
+    args.GetReturnValue().Set(array);
+  }
 
+  void WINNUS_Connect(const FunctionCallbackInfo<Value>& args) {
+    Isolate* isolate = args.GetIsolate();
+
+    // Check the number of arguments passed.
+    if (args.Length() < 1) {
+      // Throw an Error that is passed back to JavaScript
+      isolate->ThrowException(Exception::TypeError(
+          String::NewFromUtf8(isolate, "One argument expected")));
+      return;
+    }
+
+    v8::String::Utf8Value pathArg(args[0]->ToString());
+
+    HANDLE hLEDevice = CreateFile(
+      *pathArg,
+      GENERIC_WRITE | GENERIC_READ,
+      FILE_SHARE_READ | FILE_SHARE_WRITE,
+      NULL,
+      OPEN_EXISTING,
+      0,
+      NULL);
+    if (!hLEDevice)
+      RETURN_ERR("Couldn't open BLE device");
+
+      // Step 2: Get a list of services that the device advertises
+  	// first send 0, NULL as the parameters to BluetoothGATTServices inorder to get the number of
+  	// services in serviceBufferCount
+  	USHORT serviceBufferCount;
+  	////////////////////////////////////////////////////////////////////////////
+  	// Determine Services Buffer Size
+  	////////////////////////////////////////////////////////////////////////////
+
+  	HRESULT hr = BluetoothGATTGetServices(
+  		hLEDevice,
+  		0,
+  		NULL,
+  		&serviceBufferCount,
+  		BLUETOOTH_GATT_FLAG_NONE);
+
+  	if (HRESULT_FROM_WIN32(ERROR_MORE_DATA) != hr) {
+  		printf("BluetoothGATTGetServices - Buffer Size %d\n", hr);
   	}
 
-    args.GetReturnValue().Set(array);
+  	PBTH_LE_GATT_SERVICE pServiceBuffer = (PBTH_LE_GATT_SERVICE)
+  		malloc(sizeof(BTH_LE_GATT_SERVICE) * serviceBufferCount);
+
+  	if (NULL == pServiceBuffer) {
+  		printf("pServiceBuffer out of memory\n");
+  	}
+  	else {
+  		RtlZeroMemory(pServiceBuffer,
+  			sizeof(BTH_LE_GATT_SERVICE) * serviceBufferCount);
+  	}
+
+    ////////////////////////////////////////////////////////////////////////////
+    	// Retrieve Services
+    	////////////////////////////////////////////////////////////////////////////
+
+    	USHORT numServices;
+    	hr = BluetoothGATTGetServices(
+    		hLEDevice,
+    		serviceBufferCount,
+    		pServiceBuffer,
+    		&numServices,
+    		BLUETOOTH_GATT_FLAG_NONE);
+
+    	if (S_OK != hr) {
+    		printf("BluetoothGATTGetServices - Buffer Size %d\n", hr);
+    	}
+
+    	// Step 3: now get the list of charactersitics. note how the pServiceBuffer is required from step 2
+    	////////////////////////////////////////////////////////////////////////////
+    	// Determine Characteristic Buffer Size
+    	////////////////////////////////////////////////////////////////////////////
+
+    	USHORT charBufferSize;
+    	hr = BluetoothGATTGetCharacteristics(
+    		hLEDevice,
+    		pServiceBuffer,
+    		0,
+    		NULL,
+    		&charBufferSize,
+    		BLUETOOTH_GATT_FLAG_NONE);
+
+    	if (HRESULT_FROM_WIN32(ERROR_MORE_DATA) != hr) {
+    		printf("BluetoothGATTGetCharacteristics - Buffer Size %d\n", hr);
+    	}
+
+    	PBTH_LE_GATT_CHARACTERISTIC pCharBuffer;
+    	if (charBufferSize > 0) {
+    		pCharBuffer = (PBTH_LE_GATT_CHARACTERISTIC)
+    			malloc(charBufferSize * sizeof(BTH_LE_GATT_CHARACTERISTIC));
+
+    		if (NULL == pCharBuffer) {
+    			printf("pCharBuffer out of memory\n");
+    		}
+    		else {
+    			RtlZeroMemory(pCharBuffer,
+    				charBufferSize * sizeof(BTH_LE_GATT_CHARACTERISTIC));
+    		}
+
+    		////////////////////////////////////////////////////////////////////////////
+    		// Retrieve Characteristics
+    		////////////////////////////////////////////////////////////////////////////
+    		USHORT numChars;
+    		hr = BluetoothGATTGetCharacteristics(
+    			hLEDevice,
+    			pServiceBuffer,
+    			charBufferSize,
+    			pCharBuffer,
+    			&numChars,
+    			BLUETOOTH_GATT_FLAG_NONE);
+
+    		if (S_OK != hr) {
+    			printf("BluetoothGATTGetCharacteristics - Actual Data %d\n", hr);
+    		}
+
+    		if (numChars != charBufferSize) {
+    			printf("buffer size and buffer size actual size mismatch\n");
+    		}
+    	}
+
+
+    	PBTH_LE_GATT_CHARACTERISTIC rxGattChar = 0;
+    	PBTH_LE_GATT_CHARACTERISTIC txGattChar = 0;
+    	for (int ii = 0; ii <charBufferSize; ii++) {
+    		PBTH_LE_GATT_CHARACTERISTIC currGattChar;
+    		currGattChar = &pCharBuffer[ii];
+    		USHORT charValueDataSize;
+
+    		if (currGattChar->CharacteristicUuid.Value.ShortUuid==2) {
+    			// TX characteristic
+    			txGattChar = currGattChar;
+    			const char *data = "LED1.set()\n";
+    			PBTH_LE_GATT_CHARACTERISTIC_VALUE value = (PBTH_LE_GATT_CHARACTERISTIC_VALUE)new uint8_t[sizeof(ULONG)+strlen(data)];
+    			value->DataSize = strlen(data);
+    			memcpy(&value->Data, data, value->DataSize);
+    			hr = BluetoothGATTSetCharacteristicValue(
+    				hLEDevice,
+    				currGattChar,
+    				value,
+    				0,
+    				BLUETOOTH_GATT_FLAG_WRITE_WITHOUT_RESPONSE
+    			);
+    			delete value;
+    		}
+
+    		if (currGattChar->CharacteristicUuid.Value.ShortUuid == 3) {
+    			// RX characteristic
+    			rxGattChar = currGattChar;
+    			///////////////////////////////////////////////////////////////////////////
+    			// Determine Descriptor Buffer Size
+    			////////////////////////////////////////////////////////////////////////////
+    			USHORT descriptorBufferSize;
+    			hr = BluetoothGATTGetDescriptors(
+    				hLEDevice,
+    				currGattChar,
+    				0,
+    				NULL,
+    				&descriptorBufferSize,
+    				BLUETOOTH_GATT_FLAG_NONE);
+
+    			if (HRESULT_FROM_WIN32(ERROR_MORE_DATA) != hr) {
+    				printf("BluetoothGATTGetDescriptors - Buffer Size %d\n", hr);
+    			}
+
+    			PBTH_LE_GATT_DESCRIPTOR pDescriptorBuffer;
+    			if (descriptorBufferSize > 0) {
+    				pDescriptorBuffer = (PBTH_LE_GATT_DESCRIPTOR)
+    					malloc(descriptorBufferSize
+    						* sizeof(BTH_LE_GATT_DESCRIPTOR));
+
+    				if (NULL == pDescriptorBuffer) {
+    					printf("pDescriptorBuffer out of memory\n");
+    				}
+    				else {
+    					RtlZeroMemory(pDescriptorBuffer, descriptorBufferSize);
+    				}
+
+    				////////////////////////////////////////////////////////////////////////////
+    				// Retrieve Descriptors
+    				////////////////////////////////////////////////////////////////////////////
+
+    				USHORT numDescriptors;
+    				hr = BluetoothGATTGetDescriptors(
+    					hLEDevice,
+    					currGattChar,
+    					descriptorBufferSize,
+    					pDescriptorBuffer,
+    					&numDescriptors,
+    					BLUETOOTH_GATT_FLAG_NONE);
+
+    				if (S_OK != hr) {
+    					printf("BluetoothGATTGetDescriptors - Actual Data %d\n", hr);
+    				}
+
+    				if (numDescriptors != descriptorBufferSize) {
+    					printf("buffer size and buffer size actual size mismatch\n");
+    				}
+
+    				for (int kk = 0; kk < numDescriptors; kk++) {
+    					PBTH_LE_GATT_DESCRIPTOR  currGattDescriptor = &pDescriptorBuffer[kk];
+    					////////////////////////////////////////////////////////////////////////////
+    					// Determine Descriptor Value Buffer Size
+    					////////////////////////////////////////////////////////////////////////////
+    					USHORT descValueDataSize;
+    					hr = BluetoothGATTGetDescriptorValue(
+    						hLEDevice,
+    						currGattDescriptor,
+    						0,
+    						NULL,
+    						&descValueDataSize,
+    						BLUETOOTH_GATT_FLAG_NONE);
+
+    					if (HRESULT_FROM_WIN32(ERROR_MORE_DATA) != hr) {
+    						printf("BluetoothGATTGetDescriptorValue - Buffer Size %d\n", hr);
+    					}
+
+    					PBTH_LE_GATT_DESCRIPTOR_VALUE pDescValueBuffer = (PBTH_LE_GATT_DESCRIPTOR_VALUE)malloc(descValueDataSize);
+
+    					if (NULL == pDescValueBuffer) {
+    						printf("pDescValueBuffer out of memory\n");
+    					}
+    					else {
+    						RtlZeroMemory(pDescValueBuffer, descValueDataSize);
+    					}
+
+    					////////////////////////////////////////////////////////////////////////////
+    					// Retrieve the Descriptor Value
+    					////////////////////////////////////////////////////////////////////////////
+
+    					hr = BluetoothGATTGetDescriptorValue(
+    						hLEDevice,
+    						currGattDescriptor,
+    						(ULONG)descValueDataSize,
+    						pDescValueBuffer,
+    						NULL,
+    						BLUETOOTH_GATT_FLAG_NONE);
+    					if (S_OK != hr) {
+    						printf("BluetoothGATTGetDescriptorValue - Actual Data %d\n", hr);
+    					}
+    					// you may also get a descriptor that is read (and not notify) andi am guessing the attribute handle is out of limits
+    					// we set all descriptors that are notifiable to notify us via IsSubstcibeToNotification
+    					if (currGattDescriptor->AttributeHandle < 255) {
+    						BTH_LE_GATT_DESCRIPTOR_VALUE newValue;
+
+    						RtlZeroMemory(&newValue, sizeof(newValue));
+
+    						newValue.DescriptorType = ClientCharacteristicConfiguration;
+    						newValue.ClientCharacteristicConfiguration.IsSubscribeToNotification = TRUE;
+
+    						hr = BluetoothGATTSetDescriptorValue(
+    							hLEDevice,
+    							currGattDescriptor,
+    							&newValue,
+    							BLUETOOTH_GATT_FLAG_NONE);
+    						if (S_OK != hr) {
+    							printf("BluetoothGATTGetDescriptorValue - Actual Data %d\n", hr);
+    						}
+    					}
+    				}
+    			}
+
+    			// set the appropriate callback function when the descriptor change value
+    			BLUETOOTH_GATT_EVENT_HANDLE EventHandle;
+
+    			if (currGattChar->IsNotifiable) {
+    				printf("Setting Notification for ServiceHandle %d\n", currGattChar->ServiceHandle);
+    				BTH_LE_GATT_EVENT_TYPE EventType = CharacteristicValueChangedEvent;
+
+    				BLUETOOTH_GATT_VALUE_CHANGED_EVENT_REGISTRATION EventParameterIn;
+    				EventParameterIn.Characteristics[0] = *currGattChar;
+    				EventParameterIn.NumCharacteristics = 1;
+    				hr = BluetoothGATTRegisterEvent(
+    					hLEDevice,
+    					EventType,
+    					&EventParameterIn,
+    					HandleBLENotification,
+    					NULL,
+    					&EventHandle,
+    					BLUETOOTH_GATT_FLAG_NONE);
+
+    				if (S_OK != hr) {
+    					printf("BluetoothGATTRegisterEvent - Actual Data %d\n", hr);
+    				}
+    			}
+
+    		}
+
+    	}
+
+    	// go into an inf loop that sleeps. you will ideally see notifications from the HR device
+
+    		printf("sleep\n");
+    		Sleep(1000);
+
+
+    	CloseHandle(hLEDevice);
+
+    	if (GetLastError() != NO_ERROR &&
+    		GetLastError() != ERROR_NO_MORE_ITEMS)
+    	{
+    		// Insert error handling here.
+    		return;
+    	}
   }
 
 
 void init(Local<Object> exports) {
-  NODE_SET_METHOD(exports, "getDevices", WINNUS_GetDevices);
+  NODE_SET_METHOD(exports, "getDevicePaths", WINNUS_GetDevicePaths);
+  NODE_SET_METHOD(exports, "getDeviceNames", WINNUS_GetDeviceNames);
+  NODE_SET_METHOD(exports, "connect", WINNUS_Connect);
 }
 
 NODE_MODULE(winnus, init)
