@@ -55,19 +55,20 @@ std::list<RXDataPacket> RXData;
 
 
 void safeCloseConnection() {
-  if (hLEDevice) CloseHandle(hLEDevice);
-  GetLastError(); // whatever. we don't care now!
-  hLEDevice = 0;
-
   pRXCharacteristic = 0;
   pTXCharacteristic = 0;
   if (pCharacteristics) free(pCharacteristics);
   pCharacteristics = 0;
+
+  if (hLEDevice) CloseHandle(hLEDevice);
+  GetLastError(); // whatever. we don't care now!
+  hLEDevice = 0;
 }
 
 
 void HandleBLENotification(BTH_LE_GATT_EVENT_TYPE EventType, PVOID EventOutParameter, PVOID Context) {
 	PBLUETOOTH_GATT_VALUE_CHANGED_EVENT ValueChangedEventParameters = (PBLUETOOTH_GATT_VALUE_CHANGED_EVENT)EventOutParameter;
+  if (!ValueChangedEventParameters) return;
 	if (ValueChangedEventParameters->CharacteristicValue->DataSize) {
     RXDataPacket data;
     data.len = ValueChangedEventParameters->CharacteristicValue->DataSize;
@@ -276,7 +277,7 @@ void WINNUS_Connect(const FunctionCallbackInfo<Value>& args) {
   hLEDevice = CreateFile(
     *pathArg,
     GENERIC_WRITE | GENERIC_READ,
-    FILE_SHARE_READ | FILE_SHARE_WRITE,
+    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_FLAG_DELETE_ON_CLOSE,
     NULL,
     OPEN_EXISTING,
     0,
@@ -566,7 +567,8 @@ void WINNUS_Read(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
 
   if (RXData.empty()) return;
-  RXDataPacket data = RXData.front();
+  // maybe pointer needs to be static for NewFromOneByte?
+  static RXDataPacket data = RXData.front();
   RXData.pop_front();
 
   args.GetReturnValue().Set(
