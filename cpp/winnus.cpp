@@ -42,6 +42,7 @@ using v8::Handle;
 #define RETURN_ERR(text) {isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, text)));return;}
 
 HANDLE hLEDevice = 0;
+BLUETOOTH_GATT_EVENT_HANDLE hRXEvent;
 PBTH_LE_GATT_CHARACTERISTIC pCharacteristics = 0;
 PBTH_LE_GATT_CHARACTERISTIC pTXCharacteristic = 0; // send to Espruino (member of pCharacteristics)
 PBTH_LE_GATT_CHARACTERISTIC pRXCharacteristic = 0; // read from Espruino (member of pCharacteristics)
@@ -51,10 +52,17 @@ typedef struct  {
   uint8_t data[32];
 } RXDataPacket;
 
-std::list<RXDataPacket> RXData;
+// Must be uint8_t so that it rolls over correctly
+volatile uint8_t rxHead = 0;
+volatile uint8_t rxTail = 0;
+RXDataPacket RXData[256];
 
 
 void safeCloseConnection() {
+  if (hRXEvent)
+    BluetoothGATTUnregisterEvent(hRXEvent, BLUETOOTH_GATT_FLAG_NONE);
+  hRXEvent = 0;
+
   pRXCharacteristic = 0;
   pTXCharacteristic = 0;
   if (pCharacteristics) free(pCharacteristics);
@@ -77,7 +85,7 @@ void HandleBLENotification(BTH_LE_GATT_EVENT_TYPE EventType, PVOID EventOutParam
       data.len = sizeof(data.data);
     }
     memcpy(data.data, ValueChangedEventParameters->CharacteristicValue->Data, data.len);
-    RXData.push_back(data);
+    RXData[rxHead++] = data;
 	}
 }
 
@@ -506,8 +514,6 @@ void WINNUS_Connect(const FunctionCallbackInfo<Value>& args) {
   			}
 
   			// set the appropriate callback function when the descriptor change value
-  			BLUETOOTH_GATT_EVENT_HANDLE EventHandle;
-
   			if (currGattChar->IsNotifiable) {
   				BTH_LE_GATT_EVENT_TYPE EventType = CharacteristicValueChangedEvent;
 
@@ -520,7 +526,7 @@ void WINNUS_Connect(const FunctionCallbackInfo<Value>& args) {
   					&EventParameterIn,
   					HandleBLENotification,
   					NULL,
-  					&EventHandle,
+  					&hRXEvent,
   					BLUETOOTH_GATT_FLAG_NONE);
 
   				if (S_OK != hr) {
@@ -550,30 +556,31 @@ void WINNUS_Write(const FunctionCallbackInfo<Value>& args) {
   if (!pTXCharacteristic)
     RETURN_ERR("No TX characteristic found");
 
-  PBTH_LE_GATT_CHARACTERISTIC_VALUE value = (PBTH_LE_GATT_CHARACTERISTIC_VALUE)new uint8_t[sizeof(ULONG)+dataArg.length()];
-  value->DataSize = dataArg.length();
-  memcpy(&value->Data, *dataArg, dataArg.length());
-  HRESULT hr = BluetoothGATTSetCharacteristicValue(
-    hLEDevice,
-    pTXCharacteristic,
-    value,
-    0,
-    BLUETOOTH_GATT_FLAG_WRITE_WITHOUT_RESPONSE
-  );
-  delete value;
+  if (dataArg.length()) {
+    PBTH_LE_GATT_CHARACTERISTIC_VALUE value = (PBTH_LE_GATT_CHARACTERISTIC_VALUE)new uint8_t[sizeof(ULONG)+dataArg.length()];
+    value->DataSize = dataArg.length();
+    memcpy(&value->Data, *dataArg, dataArg.length());
+    HRESULT hr = BluetoothGATTSetCharacteristicValue(
+      hLEDevice,
+      pTXCharacteristic,
+      value,
+      0,
+      BLUETOOTH_GATT_FLAG_WRITE_WITHOUT_RESPONSE
+    );
+    delete value;
+  }
 }
 
 void WINNUS_Read(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
 
-  if (RXData.empty()) return;
+  if (rxHead==rxTail) return;
   // maybe pointer needs to be static for NewFromOneByte?
-  static RXDataPacket data = RXData.front();
-  RXData.pop_front();
+  RXDataPacket *data = &RXData[rxTail++];
 
   args.GetReturnValue().Set(
     String::NewFromOneByte(isolate,
-      (const uint8_t *)data.data, String::kNormalString, data.len));
+      (const uint8_t *)data->data, String::kNormalString, data->len));
 }
 
 void WINNUS_Disconnect(const FunctionCallbackInfo<Value>& args) {
