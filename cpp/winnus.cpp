@@ -277,7 +277,7 @@ void WINNUS_Connect(const FunctionCallbackInfo<Value>& args) {
   hLEDevice = CreateFile(
     *pathArg,
     GENERIC_WRITE | GENERIC_READ,
-    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_FLAG_DELETE_ON_CLOSE,
+    FILE_SHARE_READ | FILE_SHARE_WRITE,
     NULL,
     OPEN_EXISTING,
     0,
