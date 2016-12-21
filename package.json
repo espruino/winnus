@@ -1,7 +1,7 @@
 {
   "name": "winnus",
   "version": "0.0.1",
-  "description": "Windows 8 and above BLE NUS support",
+  "description": "Windows 8.1 and above BLE NUS support",
   "main": "winnus.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
