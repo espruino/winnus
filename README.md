@@ -1,7 +1,7 @@
 winnus
 ======
 
-Nordic UART for Windows, using Windows BLE APIs
+Bluetooth LE Nordic UART for Node.js on Windows, using Windows BLE APIs
 
 Created for the [Espruino and Puck.js](http://www.espruino.com)
 
