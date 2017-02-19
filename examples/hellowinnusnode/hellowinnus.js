@@ -29,7 +29,7 @@ try {
   console.error(error);
   process.exit(errorCode);
 }
-winnus.write("Hello");
+winnus.write("Hello\r");
 
 errorCode++;
 setTimeout(function() {
