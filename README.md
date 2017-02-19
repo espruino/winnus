@@ -29,7 +29,7 @@ Please start with:
 
 Clone this repository, then use the simple node example as a start.
 
-Sucess is indicated by finding an advertisement and Got data "Hello", for example:
+Sucess is indicated by finding an advertisement and Got data, for example:
 
 ```
 winnus\examples\hellowinnusnode>node hellowinnus.js
@@ -40,5 +40,5 @@ winnus\examples\hellowinnusnode>node hellowinnus.js
   address: 'df:f5:a5:ec:43:1b',
   path: '\\\\?\\bthledevice#{6e400001-b5a3-f393-e0a9-e50e24dcca9e}_dff5a5ec431b#8&17558516&0&000b#{6e400001-b5a3-f393-e0a9-e50e24dcca9e}' }
 Connect
-Got data "Hello"
+Got data "Hello\r\nUncaught Refe"
 ```
