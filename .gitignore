@@ -1,2 +1,6 @@
-node_modules
-build
+logs
+*.logs
+npm-debug.log*
+node_modules/
+build/
+cache/
