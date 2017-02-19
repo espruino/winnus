@@ -24,12 +24,13 @@ setTimeout(function() {
 Please start with a Nordic Semiconductor device, the puck.js and:
 
 - git clone the repository
-- npm install
-- node hello.js
+
+Then use the simple node example as a start.
 
 Sucess is indicated by finding an advertisement and Got data "Hello", for example:
 
 ```
+winnus\examples\hellowinnusnode>node hellowinnus.js
 [ { name: 'Puck.js 431b',
     address: 'df:f5:a5:ec:43:1b',
     path: '\\\\?\\bthledevice#{6e400001-b5a3-f393-e0a9-e50e24dcca9e}_dff5a5ec431b#8&17558516&0&000b#{6e400001-b5a3-f393-e0a9-e50e24dcca9e}' } ]
