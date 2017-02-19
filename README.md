@@ -21,11 +21,13 @@ setTimeout(function() {
 
 ## Developement
 
-Please start with a Nordic Semiconductor device, the puck.js and:
+Please start with:
+- the puck.js, a Nordic Semiconductor device.
+- [Visual C++ 2015 Build Tools](http://landinghub.visualstudio.com/visual-cpp-build-tools) 
+- [Python 2.7](https://www.python.org/downloads/):
+- [git](https://git-scm.com/)
 
-- git clone the repository
-
-Then use the simple node example as a start.
+Clone this repository, then use the simple node example as a start.
 
 Sucess is indicated by finding an advertisement and Got data "Hello", for example:
 
