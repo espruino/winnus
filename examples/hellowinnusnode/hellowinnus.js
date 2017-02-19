@@ -1,4 +1,4 @@
-var winnus = require("./winnus");
+var winnus = require("winnus");
 var devices = null;
 var device = null;
 var errorCode = 0;

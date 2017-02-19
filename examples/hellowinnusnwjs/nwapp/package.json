@@ -1,0 +1,25 @@
+{
+  "main": "hellowwinnusnwjs.html",
+  "name": "hellowinnusnw",
+  "description": "",
+  "version": "1.0.0",
+  "keywords": [ "winnus" ],
+  "window": {
+    "title": "Hello winnus nw.js",
+    "toolbar": false,
+    "frame": true,
+    "width": 800,
+    "height": 500,
+    "position": "center",
+    "min_width": 400,
+    "min_height": 200,
+    "max_width": 800,
+    "max_height": 600
+  },
+  "webkit": {
+    "plugin": true
+  },
+  "dependencies": {
+    "winnus":"latest"
+  }
+}

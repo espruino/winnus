@@ -1,0 +1,28 @@
+{
+  "name": "hellowwinnus",
+  "version": "1.0.0",
+  "description": "Minimum winnus to ensure tests and function",
+  "main": "hellowwinnus.js",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/Espruino/winnus.git"
+  },
+  "scripts": {
+    "start": "nw --enable-logging=stderr .",
+    "nwbuild": "nwbuild -o build -r 0.18.2 -p win32,win64 nwapp",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Gordon Williams <gw@pur3.co.uk> (http://espruino.com)",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "gulp": "^3.x",
+    "nw-builder": "^2.x"
+  },
+  "dependencies": {
+    "gulp-util": "^2.2.14"
+  },
+  "bugs": {
+    "url": "https://github.com/Espruino/winnus/issues"
+  },
+  "homepage": "https://github.com/Espruino/winnus#readme"
+}
