@@ -1,6 +1,6 @@
 # winnus
 
-Windows NUS BLE (winnus) gives Bluetooth LE Nordic UART for Node.js on Windows, using Windows BLE APIs
+Windows NUS BLE (winnus) gives access to the Nordic Semiconductor UART Service Bluetooth Low Energy  for Node.js on Windows, using Windows BLE APIs
 
 Created for the [Espruino and Puck.js](http://www.espruino.com) and Windows versions that support Windows BLE API's (8.1 and above).
 
@@ -22,7 +22,7 @@ setTimeout(function() {
 ## Developement
 
 Please start with:
-- the puck.js, a Nordic Semiconductor device.
+- the [puck.js](http://www.espruino.com/Puck.js), a Nordic Semiconductor Bluetooth Low Energy device.
 - [Visual C++ 2015 Build Tools](http://landinghub.visualstudio.com/visual-cpp-build-tools) 
 - [Python 2.7](https://www.python.org/downloads/):
 - [git](https://git-scm.com/)
