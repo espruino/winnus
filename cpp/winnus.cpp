@@ -3,7 +3,7 @@
 #pragma warning (disable: 4068)
 
 // Massive hack - not sure how to fix this with node-gyp?
-#undef NTDDI_VERSION
+// #undef NTDDI_VERSION
 #define NTDDI_VERSION NTDDI_WIN8
 
 
