@@ -4,7 +4,7 @@
 
 // Massive hack - not sure how to fix this with node-gyp?
 // #undef NTDDI_VERSION
-#define NTDDI_VERSION NTDDI_WIN8
+#define NTDDI_VERSION NTDDI_WINBLUE
 
 
 #include <windows.h>
