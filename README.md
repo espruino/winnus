@@ -6,7 +6,7 @@ Created for the [Espruino and Puck.js](http://www.espruino.com) and Windows vers
 
 ## Usage
 
-```
+```bash
 var winnus = require("winnus");
 
 var device = winnus.getDevices()[0];
@@ -22,8 +22,9 @@ setTimeout(function() {
 ## Developement
 
 Please start with:
+
 - the [puck.js](http://www.espruino.com/Puck.js), a Nordic Semiconductor Bluetooth Low Energy device.
-- [Visual C++ 2015 Build Tools](http://landinghub.visualstudio.com/visual-cpp-build-tools) 
+- [Visual C++ 2015 Build Tools](http://landinghub.visualstudio.com/visual-cpp-build-tools)
 - [Python 2.7](https://www.python.org/downloads/):
 - [git](https://git-scm.com/)
 
@@ -31,7 +32,7 @@ Clone this repository, then use the simple node example as a start.
 
 Sucess is indicated by finding an advertisement and Got data, for example:
 
-```
+```bash
 winnus\examples\hellowinnusnode>node hellowinnus.js
 [ { name: 'Puck.js 431b',
     address: 'df:f5:a5:ec:43:1b',
