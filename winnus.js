@@ -7,7 +7,7 @@ exports.getDevices = function() {
   var names = winnus.getDeviceNames();
   var paths = winnus.getDevicePaths();
   var devices = [];
-  if (typeof paths[0] === 'undefined') {
+  if (paths.length === 'undefined') {
     throw new Error("DevicePaths");
   }
   paths.forEach(function(path) {
