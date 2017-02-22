@@ -20,6 +20,6 @@
     "plugin": true
   },
   "dependencies": {
-    "winnus":"latest"
+    "winnus":"0.0.3"
   }
 }
