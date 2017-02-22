@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>winnus with nw.js</title>
+</head>
+<body>
+    <p id="os"></p>
+    <p id="devices"></p>
+    <p id="device"></p>
+    <p id="connect"></p>
+    <p id="write"></p>
+    <p id="error"></p>
+<script>
+var os = require('os');
+var winnus = require('winnus');
+
+var error = null;
+var devices = null;
+var device = null;
+var hello = "Hello\r";
+
+var osId = document.getElementById("os");
+var devicesId = document.getElementById("devices");
+var deviceId = document.getElementById("device");
+var connectId = document.getElementById("connect");
+var writeId = document.getElementById("write");
+var errorId = document.getElementById("error");
+
+osId.innerHTML = os.platform();
+
+try{
+    devicesId.innerHTML = "winus.getDevices()"
+    devices = winnus.getDevices();
+}catch (e){
+    error = e;
+}
+
+if ( error === null ){
+    devicesId.innerHTML = JSON.stringify(devices);
+    device = devices[0];
+    deviceId.innerHTML = JSON.stringify(device);
+}
+
+if ( error === null ){
+    connectId.innerHTML = "winus.connect " + JSON.stringify(device);
+    try{
+        winnus.connect(device, function(data) {
+            connectId.innerHTML = JSON.stringify(data);
+        });
+    }catch (e){
+        error = e;
+    }
+}
+
+if ( error === null){
+    writeId.innerHTML = "winnus.write "+hello;
+    winnus.write(hello);
+    setTimeout(function() {
+        errorId.innerHTML = error;
+        winnus.disconnect();
+    }, 1000);
+}else{
+    errorId.innerHTML= error;
+}
+</script>
+</body>
+</html>

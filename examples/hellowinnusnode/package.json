@@ -1,0 +1,23 @@
+{
+  "name": "hellowwinnusnode",
+  "version": "1.0.0",
+  "description": "Minimum winnus to ensure tests and function",
+  "main": "hellowwinnus.js",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/Espruino/winnus.git"
+  },
+  "scripts": {
+    "start": "node hellowinnus.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Gordon Williams <gw@pur3.co.uk> (http://espruino.com)",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "winnus": "latest"
+  },
+  "bugs": {
+    "url": "https://github.com/Espruino/winnus/issues"
+  },
+  "homepage": "https://github.com/Espruino/winnus#readme"
+}
