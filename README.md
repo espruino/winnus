@@ -27,6 +27,7 @@ Please start with:
 - [Visual C++ 2015 Build Tools](http://landinghub.visualstudio.com/visual-cpp-build-tools)
 - [Python 2.7](https://www.python.org/downloads/):
 - [git](https://git-scm.com/)
+- [node](https://nodejs.org/en/)
 
 Clone this repository, then use the simple node example as a start.
 
