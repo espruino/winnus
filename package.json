@@ -1,6 +1,6 @@
 {
   "name": "winnus",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Windows 8.1 and above BLE NUS support",
   "main": "winnus.js",
   "scripts": {
@@ -13,6 +13,9 @@
   },
   "keywords": [
     "espruino","bluetooth","ble","bluetooth le"
+  ],
+  "os": [
+    "win32"
   ],
   "author": "Gordon Williams <gw@pur3.co.uk> (http://espruino.com)",
   "license": "MPLv2",
