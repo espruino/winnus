@@ -580,7 +580,7 @@ void WINNUS_Read(const FunctionCallbackInfo<Value>& args) {
 
   args.GetReturnValue().Set(
     String::NewFromOneByte(isolate,
-      (const uint8_t *)data->data, String::kNormalString, data->len));
+      (const uint8_t *)data->data, v8::NewStringType::kNormal, data->len).ToLocalChecked());
 }
 
 void WINNUS_Disconnect(const FunctionCallbackInfo<Value>& args) {
