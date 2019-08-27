@@ -1,6 +1,6 @@
 {
   "name": "winnus",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Windows 8.1 and above BLE NUS support",
   "main": "winnus.js",
   "scripts": {
@@ -19,5 +19,8 @@
   ],
   "author": "Gordon Williams <gw@pur3.co.uk> (http://espruino.com)",
   "license": "MPLv2",
-  "gypfile": true
+  "gypfile": true,
+  "dependencies": {
+    "windows-build-tools": ""
+  }
 }
