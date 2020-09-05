@@ -36,7 +36,6 @@ using v8::Object;
 using v8::Persistent;
 using v8::String;
 using v8::Value;
-using v8::Handle;
 
 
 #define RETURN_ERR(text) {isolate->ThrowException(Exception::Error(String::NewFromUtf8(isolate, text)));return;}
@@ -274,7 +273,7 @@ void WINNUS_Connect(const FunctionCallbackInfo<Value>& args) {
   }
 
   // Grab argument
-  v8::String::Utf8Value pathArg(args[0]->ToString());
+  v8::String::Utf8Value pathArg(isolate, args[0]->ToString(isolate));
 
   GUID UUID_NUS, UUID_NUS_RX, UUID_NUS_TX;
 	CLSIDFromString(TEXT(L"{6e400001-b5a3-f393-e0a9-e50e24dcca9e}"), &UUID_NUS);
@@ -549,7 +548,7 @@ void WINNUS_Write(const FunctionCallbackInfo<Value>& args) {
     return;
   }
 
-  v8::String::Utf8Value dataArg(args[0]->ToString());
+  v8::String::Utf8Value dataArg(isolate, args[0]->ToString(isolate));
 
   if (!hLEDevice)
     RETURN_ERR("Bluetooth connection not open");
