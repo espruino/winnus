@@ -48,7 +48,7 @@ PBTH_LE_GATT_CHARACTERISTIC pRXCharacteristic = 0; // read from Espruino (member
 
 typedef struct  {
   unsigned int len;
-  uint8_t data[32];
+  uint8_t data[256];
 } RXDataPacket;
 
 // Must be uint8_t so that it rolls over correctly
